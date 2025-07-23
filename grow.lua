@@ -21,32 +21,19 @@ local PrefabsId = "rbxassetid://" .. ReGui.PrefabsId
 local GameEvents = ReplicatedStorage.GameEvents
 local Farms = workspace.Farm
 
--- Enhanced color palette for better visuals
+-- Simple elegant color palette
 local Accent = {
-    -- Primary colors with better contrast
-    DarkForest = Color3.fromRGB(25, 50, 20),
-    Forest = Color3.fromRGB(34, 70, 25),
-    LightGreen = Color3.fromRGB(76, 175, 80),
-    Emerald = Color3.fromRGB(46, 125, 50),
+    -- Main colors
+    DarkGreen = Color3.fromRGB(35, 75, 30),
+    Green = Color3.fromRGB(60, 130, 50),
+    LightGreen = Color3.fromRGB(85, 170, 75),
+    Brown = Color3.fromRGB(40, 32, 20),
+    LightBrown = Color3.fromRGB(55, 45, 30),
     
-    -- Secondary colors
-    DarkBrown = Color3.fromRGB(33, 25, 15),
-    LightBrown = Color3.fromRGB(62, 48, 28),
-    Gold = Color3.fromRGB(255, 193, 7),
-    Orange = Color3.fromRGB(255, 152, 0),
-    
-    -- Accent colors
+    -- Text and accents
+    White = Color3.fromRGB(255, 255, 255),
+    LightGray = Color3.fromRGB(220, 220, 220),
     Success = Color3.fromRGB(76, 175, 80),
-    Warning = Color3.fromRGB(255, 152, 0),
-    Error = Color3.fromRGB(244, 67, 54),
-    Info = Color3.fromRGB(33, 150, 243),
-    
-    -- UI elements
-    WindowBg = Color3.fromRGB(28, 32, 24),
-    CardBg = Color3.fromRGB(35, 40, 30),
-    HeaderBg = Color3.fromRGB(46, 125, 50),
-    TextPrimary = Color3.fromRGB(255, 255, 255),
-    TextSecondary = Color3.fromRGB(200, 200, 200),
 }
 
 --// Enhanced ReGui configuration with modern theme
@@ -54,17 +41,38 @@ ReGui:Init({
 	Prefabs = InsertService:LoadLocalAsset(PrefabsId)
 })
 
-ReGui:DefineTheme("ModernGardenTheme", {
-	WindowBg = Accent.DarkBrown,
-	TitleBarBg = Accent.DarkForest,
-	TitleBarBgActive = Accent.LightGreen,
-    ResizeGrab = Accent.LightGreen,
-    FrameBg = Accent.Forest,
-    FrameBgActive = Accent.LightGreen,
-	CollapsingHeaderBg = Accent.LightGreen,
-    ButtonsBg = Accent.LightGreen,
+ReGui:DefineTheme("ElegantGardenTheme", {
+	-- Window styling with clean look
+	WindowBg = Accent.Brown,
+	TitleBarBg = Accent.DarkGreen,
+	TitleBarBgActive = Accent.Green,
+    ResizeGrab = Accent.Green,
+    
+    -- Frame backgrounds
+    FrameBg = Accent.LightBrown,
+    FrameBgActive = Accent.Green,
+    
+    -- Headers
+	CollapsingHeaderBg = Accent.Green,
+	CollapsingHeaderBgActive = Accent.LightGreen,
+    
+    -- Interactive elements with larger, cleaner styling
+    ButtonsBg = Accent.Green,
+    ButtonsBgHovered = Accent.LightGreen,
     CheckMark = Accent.Success,
     SliderGrab = Accent.LightGreen,
+    
+    -- Text styling - larger and more readable
+    Text = Accent.White,
+    TextDisabled = Accent.LightGray,
+    
+    -- Combo/Dropdown specific styling
+    ComboPreview = Accent.LightBrown,
+    ComboPreviewActive = Accent.Green,
+    PopupBg = Accent.Brown,
+    
+    -- Clean separators
+    Separator = Accent.DarkGreen,
 })
 
 --// Dicts
@@ -81,9 +89,9 @@ local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThresh
 
 local function CreateWindow()
 	local Window = ReGui:Window({
-		Title = `🌱 Codepikk Tool v.1.2`,
-        Theme = "ModernGardenTheme",
-		Size = UDim2.fromOffset(350, 220)
+		Title = `🌿 Codepik v1.2.1`,
+        Theme = "ElegantGardenTheme",
+		Size = UDim2.fromOffset(360, 240)
 	})
 	return Window
 end
@@ -418,7 +426,7 @@ local function CreateCheckboxes(Parent, Dict: table)
 	for Key, Value in next, Dict do
 		Parent:Checkbox({
 			Value = Value,
-			Label = `🚫 Ignore ${Key}`,
+			Label = `Ignore ${Key}`,
 			Callback = function(_, Value)
 				Dict[Key] = Value
 			end
@@ -426,98 +434,104 @@ local function CreateCheckboxes(Parent, Dict: table)
 	end
 end
 
---// Enhanced Window Creation
+--// Elegant Window Creation
 local Window = CreateWindow()
 
---// Enhanced Auto-Plant Section
-local PlantNode = Window:TreeNode({Title="🌱 Auto-Plant System"})
+--// Auto-Plant Section with enhanced dropdowns
+local PlantNode = Window:TreeNode({Title="🌱 Auto Plant"})
 
 SelectedSeed = PlantNode:Combo({
-	Label = "🌾 Seed Type",
+	Label = "Seed Selection",
 	Selected = "",
 	GetItems = GetSeedStock,
+	-- Enhanced styling for better readability
+	ComboHeight = 22,
+	ItemSpacing = 2,
 })
 
 AutoPlant = PlantNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Plant"
+	Label = "Enable Auto Plant"
 })
 
 AutoPlantRandom = PlantNode:Checkbox({
 	Value = false,
-	Label = "🎲 Random Placement"
+	Label = "Random Placement"
 })
 
 PlantNode:Button({
-	Text = "🚀 Plant All Seeds",
+	Text = "🚀 Plant All",
 	Callback = AutoPlantLoop,
 })
 
---// Enhanced Auto-Harvest Section
-local HarvestNode = Window:TreeNode({Title="🚜 Auto-Harvest System"})
+--// Auto-Harvest Section
+local HarvestNode = Window:TreeNode({Title="🚜 Auto Harvest"})
 
 AutoHarvest = HarvestNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Harvest"
+	Label = "Enable Auto Harvest"
 })
 
-HarvestNode:Separator({Text="🎯 Harvest Filters:"})
+HarvestNode:Separator({Text="Harvest Filters"})
 CreateCheckboxes(HarvestNode, HarvestIgnores)
 
---// Enhanced Auto-Buy Section
-local BuyNode = Window:TreeNode({Title="🛒 Auto-Buy System"})
+--// Auto-Buy Section with enhanced dropdown
+local BuyNode = Window:TreeNode({Title="🛒 Auto Buy"})
 local OnlyShowStock
 
 SelectedSeedStock = BuyNode:Combo({
-	Label = "💰 Seed to Buy",
+	Label = "Seed to Purchase",
 	Selected = "",
 	GetItems = function()
 		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
 		return GetSeedStock(OnlyStock)
 	end,
+	-- Enhanced dropdown styling
+	ComboHeight = 22,
+	ItemSpacing = 2,
 })
 
 AutoBuy = BuyNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Buy"
+	Label = "Enable Auto Buy"
 })
 
 OnlyShowStock = BuyNode:Checkbox({
 	Value = false,
-	Label = "📦 Show Stock Only"
+	Label = "Show Stock Only"
 })
 
 BuyNode:Button({
-	Text = "💳 Buy All Available",
+	Text = "💳 Buy All",
 	Callback = BuyAllSelectedSeeds,
 })
 
---// Enhanced Auto-Sell Section
-local SellNode = Window:TreeNode({Title="💰 Auto-Sell System"})
+--// Auto-Sell Section
+local SellNode = Window:TreeNode({Title="💰 Auto Sell"})
 
 SellNode:Button({
-	Text = "💸 Sell Inventory",
+	Text = "💸 Sell Now",
 	Callback = SellInventory,
 })
 
 AutoSell = SellNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Sell"
+	Label = "Enable Auto Sell"
 })
 
 SellThreshold = SellNode:SliderInt({
-    Label = "📈 Crop Threshold",
+    Label = "Crop Threshold",
     Value = 15,
     Minimum = 1,
     Maximum = 199,
 })
 
---// Enhanced Utility Section
-local UtilityNode = Window:TreeNode({Title="🔧 Utilities"})
+--// Utilities Section
+local UtilityNode = Window:TreeNode({Title="🔧 Utils"})
 
 NoClip = UtilityNode:Checkbox({
 	Value = false,
-	Label = "👻 No Clip Mode"
+	Label = "No Clip Mode"
 })
 
 --// Connections
