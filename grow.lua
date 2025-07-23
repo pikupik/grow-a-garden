@@ -531,6 +531,15 @@ BuyNode:Button({
 	Callback = BuyAllSelectedSeeds,
 })
 
+
+
+--// ESP
+local EspNode = Window:TreeNode({Title="ESP Item 💰"})
+EspNode:Button({
+	Text = "Tampilkan ESP Harga Panen 🧠",
+	Callback = CreateESPForCrops
+})
+
 --// Auto-Sell
 local SellNode = Window:TreeNode({Title="Auto-Sell 💰"})
 SellNode:Button({
@@ -572,11 +581,6 @@ AutoWalkMaxWait = WallNode:SliderInt({
     Maximum = 120,
 })
 
-
-SellNode:Button({
-	Text = "Tampilkan ESP Harga Panen 🧠",
-	Callback = CreateESPForCrops
-})
 
 
 
