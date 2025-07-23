@@ -329,34 +329,34 @@ local function GetSeedStock(IgnoreNoStock: boolean?): table
 end
 
 -- Function to get available mutations from planted crops
+-- Function to get full mutation list from plants (Variant-based)
 local function GetMutationList(): table
-    local Mutations = {}
-    
-    -- Add "All" option
-    Mutations["All"] = true
-    
-    -- Scan through all planted crops to find available mutations
+    local Mutations = {
+        ["All"] = true
+    }
+
     for _, Plant in next, PlantsPhysical:GetChildren() do
+        -- Cek mutasi utama pada tanaman
+        local Variant = Plant:FindFirstChild("Variant")
+        if Variant and Variant:IsA("StringValue") then
+            Mutations[Variant.Value] = true
+        end
+
+        -- Cek mutasi pada buah tanaman jika ada
         local Fruits = Plant:FindFirstChild("Fruits")
         if Fruits then
-            -- Check fruits for mutations
             for _, Fruit in next, Fruits:GetChildren() do
-                local PlantName = Fruit:FindFirstChild("PlantName")
-                if PlantName then
-                    Mutations[PlantName.Value] = true
+                local Variant = Fruit:FindFirstChild("Variant")
+                if Variant and Variant:IsA("StringValue") then
+                    Mutations[Variant.Value] = true
                 end
-            end
-        else
-            -- Check plant itself for mutation
-            local PlantName = Plant:FindFirstChild("PlantName")
-            if PlantName then
-                Mutations[PlantName.Value] = true
             end
         end
     end
-    
+
     return Mutations
 end
+
 
 local function CanHarvest(Plant): boolean?
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
@@ -367,18 +367,19 @@ local function CanHarvest(Plant): boolean?
 end
 
 -- Enhanced function to check if plant matches selected mutation
+-- Enhanced function to check if plant matches selected mutation (based on Variant)
 local function IsTargetMutation(Plant): boolean
     if not AutoHarvestByMutation.Value then return true end
     if SelectedMutation.Selected == "All" then return true end
-    
-    -- Check if plant name matches selected mutation
-    local PlantName = Plant:FindFirstChild("PlantName")
-    if PlantName and PlantName.Value == SelectedMutation.Selected then
+
+    local Variant = Plant:FindFirstChild("Variant")
+    if Variant and Variant.Value == SelectedMutation.Selected then
         return true
     end
-    
+
     return false
 end
+
 
 -- Modified CollectHarvestable function - removed distance check and added mutation filter
 local function CollectHarvestable(Parent, Plants)
