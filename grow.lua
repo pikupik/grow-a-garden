@@ -182,12 +182,11 @@ local function CreateESPForCrops()
 	local Crops = GetInvCrops()
 
 	for _, Crop in pairs(Crops) do
-		if Crop:FindFirstChild("ESP") then continue end -- Sudah ada ESP-nya
+		if Crop:FindFirstChild("Item_String") then continue end -- Sudah ada ESP-nya
 
-		local Name = Crop:FindFirstChild("Item_String")
 		local Price = Crop:FindFirstChild("Item_Price")
 
-		if not (Name and Price) then continue end
+		if not Price then continue end
 
 		-- Buat BillboardGui
 		local Billboard = Instance.new("BillboardGui")
@@ -209,7 +208,7 @@ local function CreateESPForCrops()
 		TextLabel.TextYAlignment = Enum.TextYAlignment.Top
 
 		-- Format teks ESP
-		TextLabel.Text = `$${Price.Value}\n{Name.Value}`
+		TextLabel.Text = `$${Price.Value}`
 
 		TextLabel.Parent = Billboard
 	end
