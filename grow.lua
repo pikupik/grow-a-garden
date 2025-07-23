@@ -55,52 +55,16 @@ ReGui:Init({
 })
 
 ReGui:DefineTheme("ModernGardenTheme", {
-	-- Window styling
-	WindowBg = Accent.WindowBg,
-	WindowBgAlpha = 0.95,
-	
-	-- Title bar with gradient-like effect
-	TitleBarBg = Accent.HeaderBg,
+	WindowBg = Accent.DarkBrown,
+	TitleBarBg = Accent.DarkForest,
 	TitleBarBgActive = Accent.LightGreen,
-	TitleBarBgCollapsed = Accent.Forest,
-	
-	-- Frame backgrounds
-	FrameBg = Accent.CardBg,
-	FrameBgHovered = Accent.Forest,
-	FrameBgActive = Accent.Emerald,
-	
-	-- Resize handle
-	ResizeGrab = Accent.LightGreen,
-	ResizeGrabHovered = Accent.Gold,
-	ResizeGrabActive = Accent.Orange,
-	
-	-- Headers and collapsing sections
-	CollapsingHeaderBg = Accent.Forest,
-	CollapsingHeaderBgHovered = Accent.LightGreen,
-	CollapsingHeaderBgActive = Accent.Emerald,
-	
-	-- Button styling
-	ButtonsBg = Accent.Forest,
-	ButtonsBgHovered = Accent.LightGreen,
-	ButtonsBgActive = Accent.Emerald,
-	
-	-- Interactive elements
-	CheckMark = Accent.Success,
-	SliderGrab = Accent.LightGreen,
-	SliderGrabActive = Accent.Gold,
-	
-	-- Text colors
-	Text = Accent.TextPrimary,
-	TextDisabled = Accent.TextSecondary,
-	
-	-- Separators and borders
-	Separator = Accent.Forest,
-	Border = Accent.HeaderBg,
-	BorderShadow = Color3.fromRGB(0, 0, 0),
-	
-	-- Special elements
-	PlotLines = Accent.Info,
-	PlotLinesHovered = Accent.Warning,
+    ResizeGrab = Accent.LightGreen,
+    FrameBg = Accent.Forest,
+    FrameBgActive = Accent.LightGreen,
+	CollapsingHeaderBg = Accent.LightGreen,
+    ButtonsBg = Accent.LightGreen,
+    CheckMark = Accent.Success,
+    SliderGrab = Accent.LightGreen,
 })
 
 --// Dicts
@@ -117,11 +81,9 @@ local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThresh
 
 local function CreateWindow()
 	local Window = ReGui:Window({
-		Title = `🌱 Advanced Garden Farm Tool v2.0`,
+		Title = `🌱 Codepikk Tool v.1.2`,
         Theme = "ModernGardenTheme",
-		Size = UDim2.fromOffset(380, 280),
-		-- Add some window flags for better experience
-		WindowFlags = {"NoCollapse", "NoScrollbar"}
+		Size = UDim2.fromOffset(350, 220)
 	})
 	return Window
 end
@@ -467,63 +429,47 @@ end
 --// Enhanced Window Creation
 local Window = CreateWindow()
 
--- Add a status section at the top
-local StatusNode = Window:TreeNode({Title="📊 Farm Status", DefaultOpen=true})
-StatusNode:Text({Text = `💰 Sheckles: Loading...`})
-StatusNode:Text({Text = `🌱 Seeds: Loading...`})
-StatusNode:Text({Text = `🥕 Crops: Loading...`})
-
--- Add visual separator
-Window:Separator({Text = "⚙️ AUTOMATION TOOLS"})
-
 --// Enhanced Auto-Plant Section
-local PlantNode = Window:TreeNode({Title="🌱 Smart Planting System", DefaultOpen=true})
-PlantNode:Text({Text = "Configure your automatic planting preferences"})
+local PlantNode = Window:TreeNode({Title="🌱 Auto-Plant System"})
 
 SelectedSeed = PlantNode:Combo({
-	Label = "🌾 Select Seed Type",
+	Label = "🌾 Seed Type",
 	Selected = "",
 	GetItems = GetSeedStock,
 })
 
 AutoPlant = PlantNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Plant",
-	Help = "Automatically plants selected seeds"
+	Label = "🤖 Enable Auto-Plant"
 })
 
 AutoPlantRandom = PlantNode:Checkbox({
 	Value = false,
-	Label = "🎲 Random Placement Mode",
-	Help = "Plants at random locations instead of grid pattern"
+	Label = "🎲 Random Placement"
 })
 
 PlantNode:Button({
-	Text = "🚀 Plant All Seeds Now",
+	Text = "🚀 Plant All Seeds",
 	Callback = AutoPlantLoop,
-	ButtonColor = Accent.Success
 })
 
 --// Enhanced Auto-Harvest Section
-local HarvestNode = Window:TreeNode({Title="🚜 Advanced Harvest System", DefaultOpen=true})
-HarvestNode:Text({Text = "Automated crop collection with smart filtering"})
+local HarvestNode = Window:TreeNode({Title="🚜 Auto-Harvest System"})
 
 AutoHarvest = HarvestNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Harvest",
-	Help = "Automatically harvests ready crops"
+	Label = "🤖 Enable Auto-Harvest"
 })
 
-HarvestNode:Separator({Text="🎯 Harvest Filters"})
+HarvestNode:Separator({Text="🎯 Harvest Filters:"})
 CreateCheckboxes(HarvestNode, HarvestIgnores)
 
 --// Enhanced Auto-Buy Section
-local BuyNode = Window:TreeNode({Title="🛒 Smart Purchasing System", DefaultOpen=false})
-BuyNode:Text({Text = "Automated seed purchasing from the shop"})
-
+local BuyNode = Window:TreeNode({Title="🛒 Auto-Buy System"})
 local OnlyShowStock
+
 SelectedSeedStock = BuyNode:Combo({
-	Label = "💰 Select Seed to Buy",
+	Label = "💰 Seed to Buy",
 	Selected = "",
 	GetItems = function()
 		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
@@ -533,36 +479,30 @@ SelectedSeedStock = BuyNode:Combo({
 
 AutoBuy = BuyNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Buy",
-	Help = "Automatically purchases selected seeds"
+	Label = "🤖 Enable Auto-Buy"
 })
 
 OnlyShowStock = BuyNode:Checkbox({
 	Value = false,
-	Label = "📦 Show In-Stock Only",
-	Help = "Only display seeds that are currently available"
+	Label = "📦 Show Stock Only"
 })
 
 BuyNode:Button({
 	Text = "💳 Buy All Available",
 	Callback = BuyAllSelectedSeeds,
-	ButtonColor = Accent.Warning
 })
 
 --// Enhanced Auto-Sell Section
-local SellNode = Window:TreeNode({Title="💰 Intelligent Sales System", DefaultOpen=false})
-SellNode:Text({Text = "Automated crop selling with threshold control"})
+local SellNode = Window:TreeNode({Title="💰 Auto-Sell System"})
 
 SellNode:Button({
-	Text = "💸 Sell Inventory Now",
+	Text = "💸 Sell Inventory",
 	Callback = SellInventory,
-	ButtonColor = Accent.Success
 })
 
 AutoSell = SellNode:Checkbox({
 	Value = false,
-	Label = "🤖 Enable Auto-Sell",
-	Help = "Automatically sells crops when threshold is reached"
+	Label = "🤖 Enable Auto-Sell"
 })
 
 SellThreshold = SellNode:SliderInt({
@@ -570,46 +510,15 @@ SellThreshold = SellNode:SliderInt({
     Value = 15,
     Minimum = 1,
     Maximum = 199,
-    Help = "Sell when you have this many crops"
 })
 
 --// Enhanced Utility Section
-local UtilityNode = Window:TreeNode({Title="🔧 Utility Features", DefaultOpen=false})
-UtilityNode:Text({Text = "Additional tools and conveniences"})
+local UtilityNode = Window:TreeNode({Title="🔧 Utilities"})
 
 NoClip = UtilityNode:Checkbox({
 	Value = false,
-	Label = "👻 No Clip Mode",
-	Help = "Walk through walls and objects"
+	Label = "👻 No Clip Mode"
 })
-
-UtilityNode:Button({
-	Text = "🔄 Refresh Data",
-	Callback = function()
-		GetSeedStock()
-		GetOwnedSeeds()
-	end,
-})
-
---// Add footer info
-Window:Separator({Text = "ℹ️ INFORMATION"})
-Window:Text({Text = `🎮 Game: ${GameInfo.Name}`})
-Window:Text({Text = `👤 Player: ${LocalPlayer.Name}`})
-Window:Text({Text = "✨ Enhanced by Codepik Script v2.0"})
-
---// Status update loop for the status section
-coroutine.wrap(function()
-	while wait(1) do
-		local CropCount = #GetInvCrops()
-		local SeedCount = 0
-		for _, SeedData in pairs(OwnedSeeds) do
-			SeedCount += SeedData.Count
-		end
-		
-		-- This would need to be updated to actually change the text in the status section
-		-- The exact method depends on how ReGui handles text updates
-	end
-end)()
 
 --// Connections
 RunService.Stepped:Connect(NoclipLoop)
