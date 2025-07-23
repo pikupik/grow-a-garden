@@ -46,6 +46,7 @@ ReGui:DefineTheme("GardenTheme", {
 
 --// Dicts
 local SeedStock = {}
+local GearStock = {}
 local OwnedSeeds = {}
 local HarvestIgnores = {
 	Normal = false,
@@ -119,6 +120,30 @@ local function BuySeed(Seed: string)
 	GameEvents.BuySeedStock:FireServer(Seed)
 end
 
+local function BuyGear(Gear: string)
+	GameEvents.BuyGearStock:FireServer(Gear)
+end
+
+local function GetGearInfo(Gear: Tool): number?
+	local GearName = Gear:FindFirstChild("Gear_Name")
+	local Count = Gear:FindFirstChild("Numbers")
+	if not GearName then return end
+
+	return GearName.Value, Count.Value
+end
+
+local function CollectGearFromParent(Parent, Gear: table)
+	for _, Tool in next, Parent:GetChildren() do
+		local Name, Count = GetGearInfo(Tool)
+		if not Name then continue end
+
+		Gear[Name] = {
+            Count = Count,
+            Tool = Tool
+        }
+	end
+end
+
 local function BuyAllSelectedSeeds()
     local Seed = SelectedSeedStock.Selected
     local Stock = SeedStock[Seed]
@@ -149,6 +174,8 @@ local function CollectSeedsFromParent(Parent, Seeds: table)
         }
 	end
 end
+
+
 
 local function CollectCropsFromParent(Parent, Crops: table)
 	for _, Tool in next, Parent:GetChildren() do
@@ -304,31 +331,19 @@ local function HarvestPlant(Plant: Model)
 	fireproximityprompt(Prompt)
 end
 
-local function GetSeedStock(IgnoreNoStock: boolean?): table
-	local SeedShop = PlayerGui.Seed_Shop
-	local Items = SeedShop:FindFirstChild("Blueberry", true).Parent
+local function GetSeedStock(onlyStock)
+	local items = {}
 
-	local NewList = {}
-
-	for _, Item in next, Items:GetChildren() do
-		local MainFrame = Item:FindFirstChild("Main_Frame")
-		if not MainFrame then continue end
-
-		local StockText = MainFrame.Stock_Text.Text
-		local StockCount = tonumber(StockText:match("%d+"))
-
-		--// Seperate list
-		if IgnoreNoStock then
-			if StockCount <= 0 then continue end
-			NewList[Item.Name] = StockCount
-			continue
+	for name, amount in pairs(SeedStock) do
+		if (not onlyStock or amount > 0) then
+			local label = amount == 0 and (name .. " (Out of stock)") or (name .. " (" .. amount .. ")")
+			table.insert(items, label)
 		end
-
-		SeedStock[Item.Name] = StockCount
 	end
 
-	return IgnoreNoStock and NewList or SeedStock
+	return items
 end
+
 
 local function CanHarvest(Plant): boolean?
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
@@ -516,9 +531,8 @@ SelectedSeedStock = BuyNode:Combo({
 	Label = "Seed",
 	Selected = "",
 	GetItems = function()
-		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
-		return GetSeedStock(OnlyStock)
-	end,
+	return GetSeedStock(false) -- paksa selalu tampilkan semua
+end,
 })
 AutoBuy = BuyNode:Checkbox({
 	Value = false,
