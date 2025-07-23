@@ -46,7 +46,6 @@ ReGui:DefineTheme("GardenTheme", {
 
 --// Dicts
 local SeedStock = {}
-local GearStock = {}
 local OwnedSeeds = {}
 local HarvestIgnores = {
 	Normal = false,
@@ -55,7 +54,7 @@ local HarvestIgnores = {
 }
 
 --// Globals
-local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom, EspNode
+local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom
 
 local function CreateWindow()
 	local Window = ReGui:Window({
@@ -120,40 +119,14 @@ local function BuySeed(Seed: string)
 	GameEvents.BuySeedStock:FireServer(Seed)
 end
 
-local function BuyGear(Gear: string)
-	GameEvents.BuyGearStock:FireServer(Gear)
-end
-
-local function GetGearInfo(Gear: Tool): number?
-	local GearName = Gear:FindFirstChild("Gear_Name")
-	local Count = Gear:FindFirstChild("Numbers")
-	if not GearName then return end
-
-	return GearName.Value, Count.Value
-end
-
-local function CollectGearFromParent(Parent, Gear: table)
-	for _, Tool in next, Parent:GetChildren() do
-		local Name, Count = GetGearInfo(Tool)
-		if not Name then continue end
-
-		Gear[Name] = {
-            Count = Count,
-            Tool = Tool
-        }
-	end
-end
-
 local function BuyAllSelectedSeeds()
     local Seed = SelectedSeedStock.Selected
-    local Stock = SeedStock[Seed]
+    if not Seed or Seed == "" then return end
 
-	if not Stock or Stock <= 0 then return end
-
-    for i = 1, Stock do
-        BuySeed(Seed)
-    end
+    -- Beli meskipun stok 0, asumsikan beli 1 kali
+    BuySeed(Seed)
 end
+
 
 local function GetSeedInfo(Seed: Tool): number?
 	local PlantName = Seed:FindFirstChild("Plant_Name")
@@ -174,8 +147,6 @@ local function CollectSeedsFromParent(Parent, Seeds: table)
         }
 	end
 end
-
-
 
 local function CollectCropsFromParent(Parent, Crops: table)
 	for _, Tool in next, Parent:GetChildren() do
@@ -204,43 +175,6 @@ local function GetInvCrops(): table
 
 	return Crops
 end
-
-local function CreateESPForCrops()
-	local Crops = GetInvCrops()
-
-	for _, Crop in pairs(Crops) do
-		if Crop:FindFirstChild("Item_String") then continue end -- Sudah ada ESP-nya
-
-		local Price = Crop:FindFirstChild("Item_Price")
-
-		if not Price then continue end
-
-		-- Buat BillboardGui
-		local Billboard = Instance.new("BillboardGui")
-		Billboard.Name = "ESP"
-		Billboard.Adornee = Crop:FindFirstChild("Handle") or Crop:FindFirstChildWhichIsA("BasePart")
-		Billboard.Size = UDim2.new(0, 150, 0, 60)
-		Billboard.StudsOffset = Vector3.new(0, 2, 0)
-		Billboard.AlwaysOnTop = true
-		Billboard.Parent = Crop
-
-		-- Buat Label
-		local TextLabel = Instance.new("TextLabel")
-		TextLabel.Size = UDim2.new(1, 0, 1, 0)
-		TextLabel.BackgroundTransparency = 1
-		TextLabel.TextScaled = true
-		TextLabel.Font = Enum.Font.GothamBold
-		TextLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-		TextLabel.TextStrokeTransparency = 0.5
-		TextLabel.TextYAlignment = Enum.TextYAlignment.Top
-
-		-- Format teks ESP
-		TextLabel.Text = `$${Price.Value}`
-
-		TextLabel.Parent = Billboard
-	end
-end
-
 
 local function GetArea(Base: BasePart)
 	local Center = Base:GetPivot()
@@ -331,19 +265,31 @@ local function HarvestPlant(Plant: Model)
 	fireproximityprompt(Prompt)
 end
 
-local function GetSeedStock(onlyStock)
-	local items = {}
+local function GetSeedStock(IgnoreNoStock: boolean?): table
+	local SeedShop = PlayerGui.Seed_Shop
+	local Items = SeedShop:FindFirstChild("Blueberry", true).Parent
 
-	for name, amount in pairs(SeedStock) do
-		if (not onlyStock or amount > 0) then
-			local label = amount == 0 and (name .. " (Out of stock)") or (name .. " (" .. amount .. ")")
-			table.insert(items, label)
+	local NewList = {}
+
+	for _, Item in next, Items:GetChildren() do
+		local MainFrame = Item:FindFirstChild("Main_Frame")
+		if not MainFrame then continue end
+
+		local StockText = MainFrame.Stock_Text.Text
+		local StockCount = tonumber(StockText:match("%d+"))
+
+		--// Seperate list
+		if IgnoreNoStock then
+			if StockCount <= 0 then continue end
+			NewList[Item.Name] = StockCount
+			continue
 		end
+
+		SeedStock[Item.Name] = StockCount
 	end
 
-	return items
+	return IgnoreNoStock and NewList or SeedStock
 end
-
 
 local function CanHarvest(Plant): boolean?
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
@@ -465,9 +411,6 @@ local function StartServices()
 
 	--// Auto-Buy
 	MakeLoop(AutoBuy, BuyAllSelectedSeeds)
-	
-	--// esp
-	MakeLoop(EspNode, CreateESPForCrops)
 
 	--// Auto-Plant
 	MakeLoop(AutoPlant, AutoPlantLoop)
@@ -531,8 +474,9 @@ SelectedSeedStock = BuyNode:Combo({
 	Label = "Seed",
 	Selected = "",
 	GetItems = function()
-	return GetSeedStock(false) -- paksa selalu tampilkan semua
-end,
+		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
+		return GetSeedStock(OnlyStock)
+	end,
 })
 AutoBuy = BuyNode:Checkbox({
 	Value = false,
@@ -545,15 +489,6 @@ OnlyShowStock = BuyNode:Checkbox({
 BuyNode:Button({
 	Text = "Buy all",
 	Callback = BuyAllSelectedSeeds,
-})
-
-
-
---// ESP
-local EspNode = Window:TreeNode({Title="ESP Item 💰"})
-EspNode:Button({
-	Text = "Tampilkan ESP Harga Panen 🧠",
-	Callback = CreateESPForCrops
 })
 
 --// Auto-Sell
@@ -596,9 +531,6 @@ AutoWalkMaxWait = WallNode:SliderInt({
     Minimum = 1,
     Maximum = 120,
 })
-
-
-
 
 --// Connections
 RunService.Stepped:Connect(NoclipLoop)
