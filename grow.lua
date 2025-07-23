@@ -54,7 +54,7 @@ local HarvestIgnores = {
 }
 
 --// Globals
-local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom
+local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom, EspNode
 
 local function CreateWindow()
 	local Window = ReGui:Window({
@@ -450,6 +450,9 @@ local function StartServices()
 
 	--// Auto-Buy
 	MakeLoop(AutoBuy, BuyAllSelectedSeeds)
+	
+	--// esp
+	MakeLoop(EspNode, CreateESPForCrops)
 
 	--// Auto-Plant
 	MakeLoop(AutoPlant, AutoPlantLoop)
