@@ -84,14 +84,18 @@ local HarvestIgnores = {
 	Rainbow = false
 }
 
+-- New mutation list for harvesting
+local MutationList = {}
+
 --// Globals
 local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip
+local SelectedMutation, AutoHarvestByMutation -- New variables for mutation harvesting
 
 local function CreateWindow()
 	local Window = ReGui:Window({
-		Title = `🌿 Codepik v1.2.1`,
+		Title = `🌿 Codepik v1.3.1`,
         Theme = "ElegantGardenTheme",
-		Size = UDim2.fromOffset(360, 240)
+		Size = UDim2.fromOffset(360, 280)
 	})
 	return Window
 end
@@ -324,6 +328,36 @@ local function GetSeedStock(IgnoreNoStock: boolean?): table
 	return IgnoreNoStock and NewList or SeedStock
 end
 
+-- Function to get available mutations from planted crops
+local function GetMutationList(): table
+    local Mutations = {}
+    
+    -- Add "All" option
+    Mutations["All"] = true
+    
+    -- Scan through all planted crops to find available mutations
+    for _, Plant in next, PlantsPhysical:GetChildren() do
+        local Fruits = Plant:FindFirstChild("Fruits")
+        if Fruits then
+            -- Check fruits for mutations
+            for _, Fruit in next, Fruits:GetChildren() do
+                local PlantName = Fruit:FindFirstChild("PlantName")
+                if PlantName then
+                    Mutations[PlantName.Value] = true
+                end
+            end
+        else
+            -- Check plant itself for mutation
+            local PlantName = Plant:FindFirstChild("PlantName")
+            if PlantName then
+                Mutations[PlantName.Value] = true
+            end
+        end
+    end
+    
+    return Mutations
+end
+
 local function CanHarvest(Plant): boolean?
     local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
 	if not Prompt then return end
@@ -332,25 +366,35 @@ local function CanHarvest(Plant): boolean?
     return true
 end
 
-local function CollectHarvestable(Parent, Plants, IgnoreDistance: boolean?)
-	local Character = LocalPlayer.Character
-	local PlayerPosition = Character:GetPivot().Position
+-- Enhanced function to check if plant matches selected mutation
+local function IsTargetMutation(Plant): boolean
+    if not AutoHarvestByMutation.Value then return true end
+    if SelectedMutation.Selected == "All" then return true end
+    
+    -- Check if plant name matches selected mutation
+    local PlantName = Plant:FindFirstChild("PlantName")
+    if PlantName and PlantName.Value == SelectedMutation.Selected then
+        return true
+    end
+    
+    return false
+end
 
+-- Modified CollectHarvestable function - removed distance check and added mutation filter
+local function CollectHarvestable(Parent, Plants)
     for _, Plant in next, Parent:GetChildren() do
         --// Fruits
 		local Fruits = Plant:FindFirstChild("Fruits")
 		if Fruits then
-			CollectHarvestable(Fruits, Plants, IgnoreDistance)
+			CollectHarvestable(Fruits, Plants)
 		end
 
-		--// Distance check
-		local PlantPosition = Plant:GetPivot().Position
-		local Distance = (PlayerPosition-PlantPosition).Magnitude
-		if not IgnoreDistance and Distance > 15 then continue end
+		--// Mutation check - only harvest if it matches selected mutation
+		if not IsTargetMutation(Plant) then continue end
 
 		--// Ignore check
 		local Variant = Plant:FindFirstChild("Variant")
-		if HarvestIgnores[Variant.Value] then continue end
+		if Variant and HarvestIgnores[Variant.Value] then continue end
 
         --// Collect
         if CanHarvest(Plant) then
@@ -360,9 +404,9 @@ local function CollectHarvestable(Parent, Plants, IgnoreDistance: boolean?)
     return Plants
 end
 
-local function GetHarvestablePlants(IgnoreDistance: boolean?)
+local function GetHarvestablePlants()
     local Plants = {}
-    CollectHarvestable(PlantsPhysical, Plants, IgnoreDistance)
+    CollectHarvestable(PlantsPhysical, Plants)
     return Plants
 end
 
@@ -415,10 +459,11 @@ local function StartServices()
 	--// Auto-Plant
 	MakeLoop(AutoPlant, AutoPlantLoop)
 
-	--// Get stocks
+	--// Get stocks and update mutation list
 	while wait(.1) do
 		GetSeedStock()
 		GetOwnedSeeds()
+		MutationList = GetMutationList() -- Update available mutations
 	end
 end
 
@@ -464,12 +509,28 @@ PlantNode:Button({
 	Callback = AutoPlantLoop,
 })
 
---// Auto-Harvest Section
+--// Enhanced Auto-Harvest Section with mutation selection
 local HarvestNode = Window:TreeNode({Title="🚜 Auto Harvest"})
 
 AutoHarvest = HarvestNode:Checkbox({
 	Value = false,
 	Label = "Enable Auto Harvest"
+})
+
+-- New mutation-based harvesting option
+AutoHarvestByMutation = HarvestNode:Checkbox({
+	Value = false,
+	Label = "Harvest by Mutation"
+})
+
+SelectedMutation = HarvestNode:Combo({
+	Label = "Target Mutation",
+	Selected = "All",
+	GetItems = function()
+		return MutationList
+	end,
+	ComboHeight = 22,
+	ItemSpacing = 2,
 })
 
 HarvestNode:Separator({Text="Harvest Filters"})
