@@ -178,6 +178,44 @@ local function GetInvCrops(): table
 	return Crops
 end
 
+local function CreateESPForCrops()
+	local Crops = GetInvCrops()
+
+	for _, Crop in pairs(Crops) do
+		if Crop:FindFirstChild("ESP") then continue end -- Sudah ada ESP-nya
+
+		local Name = Crop:FindFirstChild("Item_String")
+		local Price = Crop:FindFirstChild("Item_Price")
+
+		if not (Name and Price) then continue end
+
+		-- Buat BillboardGui
+		local Billboard = Instance.new("BillboardGui")
+		Billboard.Name = "ESP"
+		Billboard.Adornee = Crop:FindFirstChild("Handle") or Crop:FindFirstChildWhichIsA("BasePart")
+		Billboard.Size = UDim2.new(0, 150, 0, 60)
+		Billboard.StudsOffset = Vector3.new(0, 2, 0)
+		Billboard.AlwaysOnTop = true
+		Billboard.Parent = Crop
+
+		-- Buat Label
+		local TextLabel = Instance.new("TextLabel")
+		TextLabel.Size = UDim2.new(1, 0, 1, 0)
+		TextLabel.BackgroundTransparency = 1
+		TextLabel.TextScaled = true
+		TextLabel.Font = Enum.Font.GothamBold
+		TextLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+		TextLabel.TextStrokeTransparency = 0.5
+		TextLabel.TextYAlignment = Enum.TextYAlignment.Top
+
+		-- Format teks ESP
+		TextLabel.Text = `$${Price.Value}\n{Name.Value}`
+
+		TextLabel.Parent = Billboard
+	end
+end
+
+
 local function GetArea(Base: BasePart)
 	local Center = Base:GetPivot()
 	local Size = Base.Size
@@ -533,6 +571,14 @@ AutoWalkMaxWait = WallNode:SliderInt({
     Minimum = 1,
     Maximum = 120,
 })
+
+
+SellNode:Button({
+	Text = "Tampilkan ESP Harga Panen 🧠",
+	Callback = CreateESPForCrops
+})
+
+
 
 --// Connections
 RunService.Stepped:Connect(NoclipLoop)
