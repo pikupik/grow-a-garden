@@ -51,7 +51,24 @@ local OwnedSeeds = {}
 local HarvestIgnores = {
 	Normal = false,
 	Gold = false,
-	Rainbow = false
+	Rainbow = false,
+	Wet = false,
+	Windstruck = false,
+	Moonlit = false,
+	Chilled = false,
+	Choc = false,
+	Sandy = false,
+	Bloodlit = false,
+	Tranquil = false,
+	Twisted = false,
+	Drenched = false,
+	Frozen = false,
+	Aurora = false,
+	HoneyGlazed = false,
+	Zombified = false,
+	Shocked = false,
+	Celestial = false,
+	Disco = false
 }
 
 --// Globals
@@ -59,7 +76,7 @@ local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThresh
 
 local function CreateWindow()
 	local Window = ReGui:Window({
-		Title = `Codepik Free`,
+		Title = `Codepik v1.0`,
         Theme = "GardenTheme",
 		Size = UDim2.fromOffset(300, 200)
 	})
@@ -474,7 +491,7 @@ local BuyNode = Window:TreeNode({Title="Auto-Buy 🥕"})
 local OnlyShowStock
 
 SelectedSeedStock = BuyNode:Combo({
-	Label = "Seed",
+	Label = "Seed Name",
 	Selected = "",
 	GetItems = function()
 		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
@@ -487,10 +504,10 @@ AutoBuy = BuyNode:Checkbox({
 })
 OnlyShowStock = BuyNode:Checkbox({
 	Value = false,
-	Label = "Only list stock"
+	Label = "Show list stock"
 })
 BuyNode:Button({
-	Text = "Buy all",
+	Text = "Buy all Seeds",
 	Callback = BuyAllSelectedSeeds,
 })
 
@@ -512,7 +529,7 @@ SellThreshold = SellNode:SliderInt({
 })
 
 --// Auto-Walk
-local WallNode = Window:TreeNode({Title="Auto-Walk 🚶"})
+local WallNode = Window:TreeNode({Title="Local Player 🚶"})
 AutoWalkStatus = WallNode:Label({
 	Text = "None"
 })
