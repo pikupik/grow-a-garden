@@ -1,3 +1,4 @@
+-- Full script: Codepik v1.0 (with Auto-Buy Seeds, Gear, and Eggs)
 
 --// Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -47,7 +48,11 @@ ReGui:DefineTheme("GardenTheme", {
 
 --// Dicts
 local SeedStock = {}
+local GearStock = {}
+local EggStock = {}
 local OwnedSeeds = {}
+-- Note: owned gears/eggs typically are tools too; we only need stock for buying
+
 local HarvestIgnores = {
 	Normal = false,
 	Gold = false,
@@ -72,7 +77,10 @@ local HarvestIgnores = {
 }
 
 --// Globals
-local SelectedSeed, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom
+local SelectedSeed, SelectedSeedStock
+local SelectedGearStock, SelectedEggStock
+local AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, AutoBuyGear, AutoBuyEgg, SellThreshold, NoClip, AutoWalkAllowRandom
+local AutoSell, AutoWalk, AutoWalkMaxWait, AutoWalkStatus
 
 local function CreateWindow()
 	local Window = ReGui:Window({
@@ -133,8 +141,19 @@ local function SellInventory()
 	IsSelling = false
 end
 
+--// Buy functions for seeds/gears/eggs
 local function BuySeed(Seed: string)
 	GameEvents.BuySeedStock:FireServer(Seed)
+end
+
+local function BuyGear(GearName: string)
+	-- assume server event name BuyGearStock exists
+	GameEvents.BuyGearStock:FireServer(GearName)
+end
+
+local function BuyEgg(EggName: string)
+	-- assume server event name BuyEggStock exists
+	GameEvents.BuyEggStock:FireServer(EggName)
 end
 
 local function BuyAllSelectedSeeds()
@@ -145,6 +164,28 @@ local function BuyAllSelectedSeeds()
 
     for i = 1, Stock do
         BuySeed(Seed)
+    end
+end
+
+local function BuyAllSelectedGears()
+    local Gear = SelectedGearStock.Selected
+    local Stock = GearStock[Gear]
+
+	if not Stock or Stock <= 0 then return end
+
+    for i = 1, Stock do
+        BuyGear(Gear)
+    end
+end
+
+local function BuyAllSelectedEggs()
+    local Egg = SelectedEggStock.Selected
+    local Stock = EggStock[Egg]
+
+	if not Stock or Stock <= 0 then return end
+
+    for i = 1, Stock do
+        BuyEgg(Egg)
     end
 end
 
@@ -286,12 +327,19 @@ local function HarvestPlant(Plant: Model)
 end
 
 local function GetSeedStock(IgnoreNoStock: boolean?): table
-	local SeedShop = PlayerGui.Seed_Shop
-	local Items = SeedShop:FindFirstChild("Blueberry", true).Parent
+	local SeedShop = PlayerGui:FindFirstChild("Seed_Shop")
+	if not SeedShop then return {} end
+
+	-- try to locate the items container robustly
+	local ItemsContainer
+	local anyChild = SeedShop:FindFirstChildWhichIsA("Frame", true)
+	if anyChild and anyChild.Parent then
+		ItemsContainer = anyChild.Parent
+	end
 
 	local NewList = {}
 
-	for _, Item in next, Items:GetChildren() do
+	for _, Item in next, (ItemsContainer and ItemsContainer:GetChildren() or {}) do
 		local MainFrame = Item:FindFirstChild("Main_Frame")
 		if not MainFrame then continue end
 
@@ -309,6 +357,70 @@ local function GetSeedStock(IgnoreNoStock: boolean?): table
 	end
 
 	return IgnoreNoStock and NewList or SeedStock
+end
+
+-- new: gear stock getter
+local function GetGearStock(IgnoreNoStock: boolean?): table
+	local GearShop = PlayerGui:FindFirstChild("Gear_Shop") or PlayerGui:FindFirstChild("Tool_Shop")
+	if not GearShop then return {} end
+
+	local ItemsContainer
+	local anyChild = GearShop:FindFirstChildWhichIsA("Frame", true)
+	if anyChild and anyChild.Parent then
+		ItemsContainer = anyChild.Parent
+	end
+
+	local NewList = {}
+
+	for _, Item in next, (ItemsContainer and ItemsContainer:GetChildren() or {}) do
+		local MainFrame = Item:FindFirstChild("Main_Frame")
+		if not MainFrame then continue end
+
+		local StockText = MainFrame.Stock_Text.Text
+		local StockCount = tonumber(StockText:match("%d+"))
+
+		if IgnoreNoStock then
+			if StockCount <= 0 then continue end
+			NewList[Item.Name] = StockCount
+			continue
+		end
+
+		GearStock[Item.Name] = StockCount
+	end
+
+	return IgnoreNoStock and NewList or GearStock
+end
+
+-- new: egg stock getter
+local function GetEggStock(IgnoreNoStock: boolean?): table
+	local EggShop = PlayerGui:FindFirstChild("Egg_Shop") or PlayerGui:FindFirstChild("EggShop")
+	if not EggShop then return {} end
+
+	local ItemsContainer
+	local anyChild = EggShop:FindFirstChildWhichIsA("Frame", true)
+	if anyChild and anyChild.Parent then
+		ItemsContainer = anyChild.Parent
+	end
+
+	local NewList = {}
+
+	for _, Item in next, (ItemsContainer and ItemsContainer:GetChildren() or {}) do
+		local MainFrame = Item:FindFirstChild("Main_Frame")
+		if not MainFrame then continue end
+
+		local StockText = MainFrame.Stock_Text.Text
+		local StockCount = tonumber(StockText:match("%d+"))
+
+		if IgnoreNoStock then
+			if StockCount <= 0 then continue end
+			NewList[Item.Name] = StockCount
+			continue
+		end
+
+		EggStock[Item.Name] = StockCount
+	end
+
+	return IgnoreNoStock and NewList or EggStock
 end
 
 local function CanHarvest(Plant): boolean?
@@ -429,8 +541,14 @@ local function StartServices()
 		HarvestPlants(PlantsPhysical)
 	end)
 
-	--// Auto-Buy
+	--// Auto-Buy Seeds
 	MakeLoop(AutoBuy, BuyAllSelectedSeeds)
+
+	--// Auto-Buy Gear
+	MakeLoop(AutoBuyGear, BuyAllSelectedGears)
+
+	--// Auto-Buy Eggs
+	MakeLoop(AutoBuyEgg, BuyAllSelectedEggs)
 
 	--// Auto-Plant
 	MakeLoop(AutoPlant, AutoPlantLoop)
@@ -439,6 +557,8 @@ local function StartServices()
 	while wait(.1) do
 		GetSeedStock()
 		GetOwnedSeeds()
+		GetGearStock()
+		GetEggStock()
 	end
 end
 
@@ -486,7 +606,7 @@ AutoHarvest = HarvestNode:Checkbox({
 HarvestNode:Separator({Text="Ignores:"})
 CreateCheckboxes(HarvestNode, HarvestIgnores)
 
---// Auto-Buy
+--// Auto-Buy Seeds
 local BuyNode = Window:TreeNode({Title="Auto-Buy 🥕"})
 local OnlyShowStock
 
@@ -509,6 +629,56 @@ OnlyShowStock = BuyNode:Checkbox({
 BuyNode:Button({
 	Text = "Buy all Seeds",
 	Callback = BuyAllSelectedSeeds,
+})
+
+--// Auto-Buy Gear
+local GearNode = Window:TreeNode({Title="Auto-Buy Gear ⚙️"})
+local OnlyShowGearStock
+
+SelectedGearStock = GearNode:Combo({
+	Label = "Gear Name",
+	Selected = "",
+	GetItems = function()
+		local OnlyStock = OnlyShowGearStock and OnlyShowGearStock.Value
+		return GetGearStock(OnlyStock)
+	end,
+})
+AutoBuyGear = GearNode:Checkbox({
+	Value = false,
+	Label = "Enabled"
+})
+OnlyShowGearStock = GearNode:Checkbox({
+	Value = false,
+	Label = "Show list stock"
+})
+GearNode:Button({
+	Text = "Buy all Gears",
+	Callback = BuyAllSelectedGears,
+})
+
+--// Auto-Buy Eggs
+local EggNode = Window:TreeNode({Title="Auto-Buy Egg 🥚"})
+local OnlyShowEggStock
+
+SelectedEggStock = EggNode:Combo({
+	Label = "Egg Name",
+	Selected = "",
+	GetItems = function()
+		local OnlyStock = OnlyShowEggStock and OnlyShowEggStock.Value
+		return GetEggStock(OnlyStock)
+	end,
+})
+AutoBuyEgg = EggNode:Checkbox({
+	Value = false,
+	Label = "Enabled"
+})
+OnlyShowEggStock = EggNode:Checkbox({
+	Value = false,
+	Label = "Show list stock"
+})
+EggNode:Button({
+	Text = "Buy all Eggs",
+	Callback = BuyAllSelectedEggs,
 })
 
 --// Auto-Sell
