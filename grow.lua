@@ -1,652 +1,410 @@
+-- ╔══════════════════════════════════════════════════╗
+-- ║       Grow A Garden 2 - Auto Farm                ║
+-- ║       UI: Rayfield | by Claude                   ║
+-- ╚══════════════════════════════════════════════════╝
 
---// Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local InsertService = game:GetService("InsertService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Rayfield = loadstring(game:HttpGet(
+    "https://sirius.menu/rayfield"))()
 
+local Players    = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local Leaderstats = LocalPlayer.leaderstats
-local Backpack = LocalPlayer.Backpack
-local PlayerGui = LocalPlayer.PlayerGui
+local RS         = game:GetService("ReplicatedStorage")
 
-local ShecklesCount = Leaderstats.Sheckles
-local GameInfo = MarketplaceService:GetProductInfo(game.PlaceId)
+-- Load Networking module
+local Networking = require(RS.SharedModules.Networking)
+local PlayerState = require(RS.ClientModules.PlayerStateClient)
 
---// ReGui
-local ReGui = loadstring(game:HttpGet('https://raw.githubusercontent.com/depthso/Dear-ReGui/refs/heads/main/ReGui.lua'))()
-local PrefabsId = "rbxassetid://" .. ReGui.PrefabsId
-
---// Folders
-local GameEvents = ReplicatedStorage.GameEvents
-local Farms = workspace.Farm
-
-local Accent = {
-    DarkGreen = Color3.fromRGB(45, 95, 25),
-    Green = Color3.fromRGB(69, 142, 40),
-    Brown = Color3.fromRGB(26, 20, 8),
+-- ══════════════════════════════════════
+--  STATE
+-- ══════════════════════════════════════
+local State = {
+    AutoHarvest  = false,
+    AutoSellAll  = false,
+    AutoMagnet   = false,
+    AutoAntiAfk  = false,
+    AutoClaimGift= false,
+    HarvestDelay = 1,
+    SellDelay    = 5,
+    MagnetDelay  = 3,
+    HarvestCount = 0,
+    SellCount    = 0,
 }
 
---// ReGui configuration (Ui library)
-ReGui:Init({
-	Prefabs = InsertService:LoadLocalAsset(PrefabsId)
-})
-ReGui:DefineTheme("GardenTheme", {
-	WindowBg = Accent.Brown,
-	TitleBarBg = Accent.DarkGreen,
-	TitleBarBgActive = Accent.Green,
-    ResizeGrab = Accent.DarkGreen,
-    FrameBg = Accent.DarkGreen,
-    FrameBgActive = Accent.Green,
-	CollapsingHeaderBg = Accent.Green,
-    ButtonsBg = Accent.Green,
-    CheckMark = Accent.Green,
-    SliderGrab = Accent.Green,
-})
-
---// Dicts
-local SeedStock = {}
-local GearStock = {}
-local OwnedSeeds = {}
-local OwnedGears = {}
-
-local HarvestIgnores = {
-	Normal = false,
-	Gold = false,
-	Rainbow = false,
-	Wet = false,
-	Windstruck = false,
-	Moonlit = false,
-	Chilled = false,
-	Choc = false,
-	Sandy = false,
-	Bloodlit = false,
-	Tranquil = false,
-	Twisted = false,
-	Drenched = false,
-	Frozen = false,
-	Aurora = false,
-	HoneyGlazed = false,
-	Zombified = false,
-	Shocked = false,
-	Celestial = false,
-	Disco = false
-}
-
---// Globals
-local SelectedSeed, SelectedGear, AutoPlantRandom, AutoPlant, AutoHarvest, AutoBuy, SellThreshold, NoClip, AutoWalkAllowRandom
-
-local function CreateWindow()
-	local Window = ReGui:Window({
-		Title = `Codepik Free`,
-        Theme = "GardenTheme",
-		Size = UDim2.fromOffset(300, 200)
-	})
-	return Window
-end
-
---// Interface functions
-local function Plant(Position: Vector3, Seed: string)
-	GameEvents.Plant_RE:FireServer(Position, Seed)
-	wait(.3)
-end
-
-local function GetFarms()
-	return Farms:GetChildren()
-end
-
-local function GetFarmOwner(Farm: Folder): string
-	local Important = Farm.Important
-	local Data = Important.Data
-	local Owner = Data.Owner
-
-	return Owner.Value
-end
-
-local function GetFarm(PlayerName: string): Folder?
-	local Farms = GetFarms()
-	for _, Farm in next, Farms do
-		local Owner = GetFarmOwner(Farm)
-		if Owner == PlayerName then
-			return Farm
-		end
-	end
-    return
-end
-
-local IsSelling = false
-
---//Sell inventory
-local function SellInventory()
-	local Character = LocalPlayer.Character
-	local Previous = Character:GetPivot()
-	local PreviousSheckles = ShecklesCount.Value
-
-	--// Prevent conflict
-	if IsSelling then return end
-	IsSelling = true
-
-	Character:PivotTo(CFrame.new(62, 4, -26))
-	while wait() do
-		if ShecklesCount.Value ~= PreviousSheckles then break end
-		GameEvents.Sell_Inventory:FireServer()
-	end
-	Character:PivotTo(Previous)
-
-	wait(0.2)
-	IsSelling = false
-end
-
---//Buy Seeds
-local function BuySeed(Seed: string)
-	GameEvents.BuySeedStock:FireServer(Seed)
-end
-
---//Buy Gears
-local function BuyGear(Gear: string)
-	GameEvents.BuyGearStock:FireServer(Gear)
-end
-
---//Buy All Selected Seeds
-local function BuyAllSelectedSeeds()
-    local Seed = SelectedSeedStock.Selected
-    local Stock = SeedStock[Seed]
-
-	if not Stock or Stock <= 0 then return end
-
-    for i = 1, Stock do
-        BuySeed(Seed)
+-- ══════════════════════════════════════
+--  HELPERS
+-- ══════════════════════════════════════
+local function safefire(net, ...)
+    local ok, err = pcall(function() net:Fire(...) end)
+    if not ok then
+        warn("[AutoFarm] Error:", err)
     end
 end
 
---//Buy  All Selected Gear
-local function BuyAllSelectedGear()
-    local Gear = SelectedGearStock.Selected
-    local Stock = GearStock[Gear]
-
-	if not Stock or Stock <= 0 then return end
-
-    for i = 1, Stock do
-        BuyGear(Gear)
-    end
+local function getGardens()
+    local ok, gardens = pcall(function()
+        local replica = PlayerState:GetLocalReplica()
+        if not replica then return {} end
+        return replica.Data and replica.Data.Gardens or {}
+    end)
+    return ok and gardens or {}
 end
 
-local function GetSeedInfo(Seed: Tool): number?
-	local PlantName = Seed:FindFirstChild("Plant_Name")
-	local Count = Seed:FindFirstChild("Numbers")
-	if not PlantName then return end
-
-	return PlantName.Value, Count.Value
-end
-
-local function GetGearInfo(Gear: Tool): number?
-	local GearName = Gear:FindFirstChild("Gear_Name")
-	local Count = Gear:FindFirstChild("Numbers")
-	if not GearName then return end
-
-	return GearName.Value, Count.Value
-end
-
-local function CollectSeedsFromParent(Parent, Seeds: table)
-	for _, Tool in next, Parent:GetChildren() do
-		local Name, Count = GetSeedInfo(Tool)
-		if not Name then continue end
-
-		Seeds[Name] = {
-            Count = Count,
-            Tool = Tool
-        }
-	end
-end
-
-local function CollectGearsFromParent(Parent, Gears: table)
-	for _, Tool in next, Parent:GetChildren() do
-		local Name, Count = GetGearInfo(Tool)
-		if not Name then continue end
-
-		Gears[Name] = {
-            Count = Count,
-            Tool = Tool
-        }
-	end
-end
-
-local function CollectCropsFromParent(Parent, Crops: table)
-	for _, Tool in next, Parent:GetChildren() do
-		local Name = Tool:FindFirstChild("Item_String")
-		if not Name then continue end
-
-		table.insert(Crops, Tool)
-	end
-end
-
-local function GetOwnedSeeds(): table
-	local Character = LocalPlayer.Character
-	
-	CollectSeedsFromParent(Backpack, OwnedSeeds)
-	CollectSeedsFromParent(Character, OwnedSeeds)
-
-	return OwnedSeeds
-end
-
-local function GetOwnedGears(): table
-	local Character = LocalPlayer.Character
-	
-	CollectGearsFromParent(Backpack, OwnedGears)
-	CollectGearsFromParent(Character, OwnedGears)
-
-	return OwnedGears
-end
-
-local function GetInvCrops(): table
-	local Character = LocalPlayer.Character
-	
-	local Crops = {}
-	CollectCropsFromParent(Backpack, Crops)
-	CollectCropsFromParent(Character, Crops)
-
-	return Crops
-end
-
-local function GetArea(Base: BasePart)
-	local Center = Base:GetPivot()
-	local Size = Base.Size
-
-	--// Bottom left
-	local X1 = math.ceil(Center.X - (Size.X/2))
-	local Z1 = math.ceil(Center.Z - (Size.Z/2))
-
-	--// Top right
-	local X2 = math.floor(Center.X + (Size.X/2))
-	local Z2 = math.floor(Center.Z + (Size.Z/2))
-
-	return X1, Z1, X2, Z2
-end
-
-local function EquipCheck(Tool)
-    local Character = LocalPlayer.Character
-    local Humanoid = Character.Humanoid
-
-    if Tool.Parent ~= Backpack then return end
-    Humanoid:EquipTool(Tool)
-end
-
---// Auto farm functions
-local MyFarm = GetFarm(LocalPlayer.Name)
-local MyImportant = MyFarm.Important
-local PlantLocations = MyImportant.Plant_Locations
-local PlantsPhysical = MyImportant.Plants_Physical
-
-local Dirt = PlantLocations:FindFirstChildOfClass("Part")
-local X1, Z1, X2, Z2 = GetArea(Dirt)
-
-local function GetRandomFarmPoint(): Vector3
-    local FarmLands = PlantLocations:GetChildren()
-    local FarmLand = FarmLands[math.random(1, #FarmLands)]
-
-    local X1, Z1, X2, Z2 = GetArea(FarmLand)
-    local X = math.random(X1, X2)
-    local Z = math.random(Z1, Z2)
-
-    return Vector3.new(X, 4, Z)
-end
-
-local function AutoPlantLoop()
-	local Seed = SelectedSeed.Selected
-
-	local SeedData = OwnedSeeds[Seed]
-	if not SeedData then return end
-
-    local Count = SeedData.Count
-    local Tool = SeedData.Tool
-
-	--// Check for stock
-	if Count <= 0 then return end
-
-    local Planted = 0
-	local Step = 1
-
-	--// Check if the client needs to equip the tool
-    EquipCheck(Tool)
-
-	--// Plant at random points
-	if AutoPlantRandom.Value then
-		for i = 1, Count do
-			local Point = GetRandomFarmPoint()
-			Plant(Point, Seed)
-		end
-	end
-	
-	--// Plant on the farmland area
-	for X = X1, X2, Step do
-		for Z = Z1, Z2, Step do
-			if Planted > Count then break end
-			local Point = Vector3.new(X, 0.13, Z)
-
-			Planted += 1
-			Plant(Point, Seed)
-		end
-	end
-end
-
-local function HarvestPlant(Plant: Model)
-	local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
-
-	--// Check if it can be harvested
-	if not Prompt then return end
-	fireproximityprompt(Prompt)
-end
-
-local function GetSeedStock(IgnoreNoStock: boolean?): table
-	local SeedShop = PlayerGui.Seed_Shop
-	local Items = SeedShop:FindFirstChild("Blueberry", true).Parent
-
-	local NewList = {}
-
-	for _, Item in next, Items:GetChildren() do
-		local MainFrame = Item:FindFirstChild("Main_Frame")
-		if not MainFrame then continue end
-
-		local StockText = MainFrame.Stock_Text.Text
-		local StockCount = tonumber(StockText:match("%d+"))
-
-		--// Seperate list
-		if IgnoreNoStock then
-			if StockCount <= 0 then continue end
-			NewList[Item.Name] = StockCount
-			continue
-		end
-
-		SeedStock[Item.Name] = StockCount
-	end
-
-	return IgnoreNoStock and NewList or SeedStock
-end
-
-local function GetGearStock(IgnoreNoStock: boolean?): table
-	local GearShop = PlayerGui.Gear_Shop
-	local Items = GearShop:FindFirstChild("Watering Can", true).Parent
-
-	local NewList = {}
-
-	for _, Item in next, Items:GetChildren() do
-		local MainFrame = Item:FindFirstChild("Main_Frame")
-		if not MainFrame then continue end
-
-		local StockText = MainFrame.Stock_Text.Text
-		local StockCount = tonumber(StockText:match("%d+"))
-
-		--// Seperate list
-		if IgnoreNoStock then
-			if StockCount <= 0 then continue end
-			NewList[Item.Name] = StockCount
-			continue
-		end
-
-		GearStock[Item.Name] = StockCount
-	end
-
-	return IgnoreNoStock and NewList or GearStock
-end
-
-local function CanHarvest(Plant): boolean?
-    local Prompt = Plant:FindFirstChild("ProximityPrompt", true)
-	if not Prompt then return end
-    if not Prompt.Enabled then return end
-
-    return true
-end
-
-local function CollectHarvestable(Parent, Plants, IgnoreDistance: boolean?)
-	local Character = LocalPlayer.Character
-	local PlayerPosition = Character:GetPivot().Position
-
-    for _, Plant in next, Parent:GetChildren() do
-        --// Fruits
-		local Fruits = Plant:FindFirstChild("Fruits")
-		if Fruits then
-			CollectHarvestable(Fruits, Plants, IgnoreDistance)
-		end
-
-		--// Distance check
-		local PlantPosition = Plant:GetPivot().Position
-		local Distance = (PlayerPosition-PlantPosition).Magnitude
-		if not IgnoreDistance and Distance > 15 then continue end
-
-		--// Ignore check
-		local Variant = Plant:FindFirstChild("Variant")
-		if HarvestIgnores[Variant.Value] then continue end
-
-        --// Collect
-        if CanHarvest(Plant) then
-            table.insert(Plants, Plant)
-        end
-	end
-    return Plants
-end
-
-local function GetHarvestablePlants(IgnoreDistance: boolean?)
-    local Plants = {}
-    CollectHarvestable(PlantsPhysical, Plants, IgnoreDistance)
-    return Plants
-end
-
-local function HarvestPlants(Parent: Model)
-	local Plants = GetHarvestablePlants()
-    for _, Plant in next, Plants do
-        HarvestPlant(Plant)
-    end
-end
-
-local function AutoSellCheck()
-    local CropCount = #GetInvCrops()
-
-    if not AutoSell.Value then return end
-    if CropCount < SellThreshold.Value then return end
-
-    SellInventory()
-end
-
-local function AutoWalkLoop()
-	if IsSelling then return end
-
-    local Character = LocalPlayer.Character
-    local Humanoid = Character.Humanoid
-
-    local Plants = GetHarvestablePlants(true)
-	local RandomAllowed = AutoWalkAllowRandom.Value
-	local DoRandom = #Plants == 0 or math.random(1, 3) == 2
-
-    --// Random point
-    if RandomAllowed and DoRandom then
-        local Position = GetRandomFarmPoint()
-        Humanoid:MoveTo(Position)
-		AutoWalkStatus.Text = "Random point"
-        return
-    end
-   
-    --// Move to each plant
-    for _, Plant in next, Plants do
-        local Position = Plant:GetPivot().Position
-        Humanoid:MoveTo(Position)
-		AutoWalkStatus.Text = Plant.Name
-    end
-end
-
-local function NoclipLoop()
-    local Character = LocalPlayer.Character
-    if not NoClip.Value then return end
-    if not Character then return end
-
-    for _, Part in Character:GetDescendants() do
-        if Part:IsA("BasePart") then
-            Part.CanCollide = false
+local function getAllFruits()
+    local fruits = {}
+    local gardens = getGardens()
+    for gardenId, gardenData in pairs(gardens) do
+        if gardenData.Fruits then
+            for fruitId, fruitData in pairs(gardenData.Fruits) do
+                table.insert(fruits, {
+                    GardenId = gardenId,
+                    FruitId  = fruitId,
+                    Data     = fruitData,
+                })
+            end
         end
     end
+    return fruits
 end
 
-local function MakeLoop(Toggle, Func)
-	coroutine.wrap(function()
-		while wait(.01) do
-			if not Toggle.Value then continue end
-			Func()
-		end
-	end)()
-end
+-- ══════════════════════════════════════
+--  LOOPS
+-- ══════════════════════════════════════
 
-local function StartServices()
-	--// Auto-Walk
-	MakeLoop(AutoWalk, function()
-		local MaxWait = AutoWalkMaxWait.Value
-		AutoWalkLoop()
-		wait(math.random(1, MaxWait))
-	end)
+-- Auto Harvest
+task.spawn(function()
+    while true do
+        task.wait(State.HarvestDelay)
+        if not State.AutoHarvest then continue end
 
-	--// Auto-Harvest
-	MakeLoop(AutoHarvest, function()
-		HarvestPlants(PlantsPhysical)
-	end)
+        local fruits = getAllFruits()
+        local harvested = 0
+        for _, fruit in ipairs(fruits) do
+            if State.AutoHarvest then
+                safefire(Networking.Garden.CollectFruit,
+                    fruit.GardenId, fruit.FruitId)
+                harvested = harvested + 1
+                task.wait(0.15)
+            end
+        end
 
-	--// Auto-Buy
-	MakeLoop(AutoBuy, BuyAllSelectedSeeds, BuyAllSelectedGear)
+        if harvested > 0 then
+            State.HarvestCount = State.HarvestCount + harvested
+        end
+    end
+end)
 
-	--// Auto-Plant
-	MakeLoop(AutoPlant, AutoPlantLoop)
+-- Auto Sell All
+task.spawn(function()
+    while true do
+        task.wait(State.SellDelay)
+        if not State.AutoSellAll then continue end
+        local ok, result = pcall(function()
+            return Networking.NPCS.SellAll:Fire()
+        end)
+        if ok and result then
+            local sold = result.SoldCount or 0
+            State.SellCount = State.SellCount + sold
+        end
+    end
+end)
 
-	--// Get stocks
-	while wait(.1) do
-		GetSeedStock()
-		GetGearStock()
-		GetOwnedSeeds()
-	end
-end
+-- Auto Fruit Magnet
+task.spawn(function()
+    while true do
+        task.wait(State.MagnetDelay)
+        if not State.AutoMagnet then continue end
+        safefire(Networking.FruitMagnet.Activate)
+    end
+end)
 
-local function CreateCheckboxes(Parent, Dict: table)
-	for Key, Value in next, Dict do
-		Parent:Checkbox({
-			Value = Value,
-			Label = Key,
-			Callback = function(_, Value)
-				Dict[Key] = Value
-			end
-		})
-	end
-end
+-- Anti AFK
+task.spawn(function()
+    while true do
+        task.wait(60)
+        if not State.AutoAntiAfk then continue end
+        safefire(Networking.AntiAfk.RequestHop)
+    end
+end)
 
---// Window
-local Window = CreateWindow()
+-- Auto Claim Gift/Mailbox
+task.spawn(function()
+    while true do
+        task.wait(30)
+        if not State.AutoClaimGift then continue end
+        local ok, inbox = pcall(function()
+            return Networking.Mailbox.OpenInbox:Fire()
+        end)
+        if ok and inbox then
+            for giftId, _ in pairs(inbox) do
+                pcall(function()
+                    Networking.Mailbox.Claim:Fire(giftId)
+                end)
+                task.wait(0.5)
+            end
+        end
+    end
+end)
 
---// Auto-Plant
-local PlantNode = Window:TreeNode({Title="Auto-Plant 🥕"})
-SelectedSeed = PlantNode:Combo({
-	Label = "Seed",
-	Selected = "",
-	GetItems = GetSeedStock,
-})
-AutoPlant = PlantNode:Checkbox({
-	Value = false,
-	Label = "Enabled"
-})
-AutoPlantRandom = PlantNode:Checkbox({
-	Value = false,
-	Label = "Plant at random points"
-})
-PlantNode:Button({
-	Text = "Plant all",
-	Callback = AutoPlantLoop,
-})
-
---// Auto-Harvest
-local HarvestNode = Window:TreeNode({Title="Auto-Harvest 🚜"})
-AutoHarvest = HarvestNode:Checkbox({
-	Value = false,
-	Label = "Enabled"
-})
-HarvestNode:Separator({Text="Ignores:"})
-CreateCheckboxes(HarvestNode, HarvestIgnores)
-
---// Auto-Buy
-local BuyNode = Window:TreeNode({Title="Auto-Buy 🥕"})
-local OnlyShowStock
-
-SelectedSeedStock = BuyNode:Combo({
-	Label = "Seed",
-	Selected = "",
-	GetItems = function()
-		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
-		return GetSeedStock(OnlyStock)
-	end,
-})
-SelectedGearStock = BuyNode:Combo({
-	Label = "Gear",
-	Selected = "",
-	GetItems = function()
-		local OnlyStock = OnlyShowStock and OnlyShowStock.Value
-		return GetGearStock(OnlyStock)
-	end,
-})
-AutoBuy = BuyNode:Checkbox({
-	Value = false,
-	Label = "Enabled"
-})
-OnlyShowStock = BuyNode:Checkbox({
-	Value = false,
-	Label = "Only list stock"
-})
-BuyNode:Button({
-	Text = "Buy all Seeds",
-	Callback = BuyAllSelectedSeeds,
-})
-BuyNode:Button({
-	Text = "Buy all Gear",
-	Callback = BuyAllSelectedGear,
+-- ══════════════════════════════════════
+--  RAYFIELD UI
+-- ══════════════════════════════════════
+local Window = Rayfield:CreateWindow({
+    Name             = "🌱 Grow A Garden 2",
+    LoadingTitle     = "Auto Farm",
+    LoadingSubtitle  = "by Claude",
+    ConfigurationSaving = {
+        Enabled  = true,
+        FileName = "GAG2_AutoFarm",
+    },
+    Discord = { Enabled = false },
+    KeySystem = false,
 })
 
---// Auto-Sell
-local SellNode = Window:TreeNode({Title="Auto-Sell 💰"})
-SellNode:Button({
-	Text = "Sell inventory",
-	Callback = SellInventory, 
-})
-AutoSell = SellNode:Checkbox({
-	Value = false,
-	Label = "Enabled"
-})
-SellThreshold = SellNode:SliderInt({
-    Label = "Crops threshold",
-    Value = 15,
-    Minimum = 1,
-    Maximum = 199,
+-- ─── TAB: FARM ───────────────────────
+local FarmTab = Window:CreateTab("🌿 Farm", nil)
+
+FarmTab:CreateSection("Auto Harvest")
+
+FarmTab:CreateToggle({
+    Name        = "Auto Harvest",
+    CurrentValue= false,
+    Flag        = "AutoHarvest",
+    Callback    = function(v)
+        State.AutoHarvest = v
+    end,
 })
 
---// Auto-Walk
-local WallNode = Window:TreeNode({Title="Local Player 🚶"})
-AutoWalkStatus = WallNode:Label({
-	Text = "None"
-})
-AutoWalk = WallNode:Checkbox({
-	Value = false,
-	Label = "Enabled"
-})
-AutoWalkAllowRandom = WallNode:Checkbox({
-	Value = true,
-	Label = "Allow random points"
-})
-NoClip = WallNode:Checkbox({
-	Value = false,
-	Label = "NoClip"
-})
-AutoWalkMaxWait = WallNode:SliderInt({
-    Label = "Max delay",
-    Value = 10,
-    Minimum = 1,
-    Maximum = 120,
+FarmTab:CreateSlider({
+    Name        = "Harvest Delay (detik)",
+    Range       = {0.5, 10},
+    Increment   = 0.5,
+    CurrentValue= 1,
+    Flag        = "HarvestDelay",
+    Callback    = function(v)
+        State.HarvestDelay = v
+    end,
 })
 
---// Connections
-RunService.Stepped:Connect(NoclipLoop)
-Backpack.ChildAdded:Connect(AutoSellCheck)
+FarmTab:CreateSection("Auto Sell")
 
---// Services
-StartServices()
+FarmTab:CreateToggle({
+    Name        = "Auto Sell All",
+    CurrentValue= false,
+    Flag        = "AutoSellAll",
+    Callback    = function(v)
+        State.AutoSellAll = v
+    end,
+})
+
+FarmTab:CreateSlider({
+    Name        = "Sell Delay (detik)",
+    Range       = {2, 30},
+    Increment   = 1,
+    CurrentValue= 5,
+    Flag        = "SellDelay",
+    Callback    = function(v)
+        State.SellDelay = v
+    end,
+})
+
+FarmTab:CreateButton({
+    Name     = "Sell Sekarang",
+    Callback = function()
+        local ok, result = pcall(function()
+            return Networking.NPCS.SellAll:Fire()
+        end)
+        if ok and result then
+            Rayfield:Notify({
+                Title    = "Sell Berhasil!",
+                Content  = "Terjual: " .. (result.SoldCount or "?") ..
+                           " buah | Harga: " .. (result.TotalSellValue or "?"),
+                Duration = 4,
+                Image    = "rbxassetid://4483345998",
+            })
+        else
+            Rayfield:Notify({
+                Title   = "Sell Gagal",
+                Content = "Coba lagi atau tidak ada buah",
+                Duration= 3,
+            })
+        end
+    end,
+})
+
+FarmTab:CreateSection("Fruit Magnet")
+
+FarmTab:CreateToggle({
+    Name        = "Auto Fruit Magnet",
+    CurrentValue= false,
+    Flag        = "AutoMagnet",
+    Callback    = function(v)
+        State.AutoMagnet = v
+    end,
+})
+
+FarmTab:CreateSlider({
+    Name        = "Magnet Delay (detik)",
+    Range       = {1, 10},
+    Increment   = 0.5,
+    CurrentValue= 3,
+    Flag        = "MagnetDelay",
+    Callback    = function(v)
+        State.MagnetDelay = v
+    end,
+})
+
+FarmTab:CreateButton({
+    Name     = "Aktifkan Magnet Sekarang",
+    Callback = function()
+        safefire(Networking.FruitMagnet.Activate)
+        Rayfield:Notify({
+            Title   = "Magnet!",
+            Content = "Menarik semua buah...",
+            Duration= 2,
+        })
+    end,
+})
+
+-- ─── TAB: MISC ───────────────────────
+local MiscTab = Window:CreateTab("⚙️ Misc", nil)
+
+MiscTab:CreateSection("Utilitas")
+
+MiscTab:CreateToggle({
+    Name        = "Anti AFK",
+    CurrentValue= false,
+    Flag        = "AutoAntiAfk",
+    Callback    = function(v)
+        State.AutoAntiAfk = v
+    end,
+})
+
+MiscTab:CreateToggle({
+    Name        = "Auto Claim Gift (Mailbox)",
+    CurrentValue= false,
+    Flag        = "AutoClaimGift",
+    Callback    = function(v)
+        State.AutoClaimGift = v
+    end,
+})
+
+MiscTab:CreateButton({
+    Name     = "Claim Gift Sekarang",
+    Callback = function()
+        local ok, inbox = pcall(function()
+            return Networking.Mailbox.OpenInbox:Fire()
+        end)
+        if ok and inbox then
+            local count = 0
+            for giftId, _ in pairs(inbox) do
+                pcall(function()
+                    Networking.Mailbox.Claim:Fire(giftId)
+                end)
+                count = count + 1
+                task.wait(0.5)
+            end
+            Rayfield:Notify({
+                Title   = "Gift Claimed!",
+                Content = count .. " gift berhasil di-claim",
+                Duration= 3,
+                Image   = "rbxassetid://4483345998",
+            })
+        else
+            Rayfield:Notify({
+                Title   = "Tidak Ada Gift",
+                Content = "Mailbox kosong atau error",
+                Duration= 3,
+            })
+        end
+    end,
+})
+
+MiscTab:CreateSection("Daily Deal")
+
+MiscTab:CreateButton({
+    Name     = "Cek Daily Deal",
+    Callback = function()
+        local ok, result = pcall(function()
+            return Networking.NPCS.CheckDailyDeal:Fire()
+        end)
+        if ok and result then
+            Rayfield:Notify({
+                Title   = "Daily Deal",
+                Content = tostring(result),
+                Duration= 5,
+            })
+        end
+    end,
+})
+
+MiscTab:CreateButton({
+    Name     = "Pakai Semua Daily Deal",
+    Callback = function()
+        local ok, result = pcall(function()
+            return Networking.NPCS.UseDailyDealAll:Fire()
+        end)
+        Rayfield:Notify({
+            Title   = ok and "Daily Deal Used!" or "Gagal",
+            Content = ok and "Semua daily deal dipakai" or "Error",
+            Duration= 3,
+        })
+    end,
+})
+
+-- ─── TAB: INFO ───────────────────────
+local InfoTab = Window:CreateTab("📊 Info", nil)
+
+InfoTab:CreateSection("Status Farm")
+
+InfoTab:CreateParagraph({
+    Title   = "Cara Pakai",
+    Content = "1. Aktifkan Auto Harvest & Auto Sell\n" ..
+              "2. Set delay sesuai keinginan\n" ..
+              "3. Aktifkan Anti AFK agar tidak di-kick\n" ..
+              "4. Auto Magnet bantu collect buah lebih cepat\n" ..
+              "5. Auto Claim Gift untuk klaim hadiah mailbox",
+})
+
+InfoTab:CreateButton({
+    Name     = "Refresh Stats",
+    Callback = function()
+        Rayfield:Notify({
+            Title   = "📊 Stats",
+            Content = string.format(
+                "Harvest: %d buah\nSell: %d kali",
+                State.HarvestCount,
+                State.SellCount
+            ),
+            Duration= 5,
+        })
+    end,
+})
+
+InfoTab:CreateButton({
+    Name     = "Preview Harga Jual",
+    Callback = function()
+        local ok, result = pcall(function()
+            return Networking.NPCS.PreviewSellAll:Fire()
+        end)
+        if ok and result then
+            Rayfield:Notify({
+                Title   = "💰 Preview Sell",
+                Content = string.format(
+                    "Total: %s Sheckles\nBuah: %s",
+                    tostring(result.TotalSellValue or "?"),
+                    tostring(result.FruitCount or "?")
+                ),
+                Duration= 5,
+                Image   = "rbxassetid://4483345998",
+            })
+        end
+    end,
+})
+
+print("[GAG2] Auto Farm loaded!")
+Rayfield:Notify({
+    Title   = "🌱 Grow A Garden 2",
+    Content = "Auto Farm berhasil di-load!",
+    Duration= 4,
+    Image   = "rbxassetid://4483345998",
+})
