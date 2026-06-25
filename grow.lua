@@ -1,9 +1,13 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+-- ALL INCLUDES FOR ROBLOX SCRIPTING
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
 local Networking = require(ReplicatedStorage:WaitForChild("SharedModules"):FindFirstChild("Networking"))
 local Notify = ReplicatedStorage:WaitForChild("Notify")
 
@@ -20,7 +24,7 @@ local Window = Rayfield:CreateWindow({
    ConfigurationSaving = {
       Enabled = true,
       FolderName = nil,
-      FileName = "Nexera_GAG2"
+      FileName = "Big Hub"
    },
    Discord = {
       Enabled = false,
@@ -39,16 +43,12 @@ local Window = Rayfield:CreateWindow({
    }
 })
 
------------------------------------------------------------
--- TAB 1: FARM
------------------------------------------------------------
+-- UI FARM TAB CREATION
 local FarmTab = Window:CreateTab("Farm", "sprout")
-
--- Section: HARVEST
-local HarvestSection = FarmTab:CreateSection("Harvest")
-
+-- AUTO HARVEST TOGGLE (Working Logic)
 local isAutoHarvesting = false
-HarvestSection:CreateToggle({
+
+local HarvestToogle = FarmTab:CreateToggle({
    Name = "Auto Harvest",
    CurrentValue = false,
    Flag = "AutoHarvestToggle",
@@ -56,7 +56,7 @@ HarvestSection:CreateToggle({
       isAutoHarvesting = Value
       
       if Value then
-         Notify:Fire("Auto Harvest AKTIF! 🌾")
+         Notify:Fire("Harvesting...")
          task.spawn(function()
             while isAutoHarvesting and task.wait(0.5) do
                pcall(function()
@@ -96,65 +96,84 @@ HarvestSection:CreateToggle({
             end
          end)
       else
-         Notify:Fire("Auto Harvest DIMATIKAN")
+         Notify:Fire("Auto Harvest Disabled")
       end
    end,
 })
 
--- Section: WATER (Placeholder buat nanti)
-local WaterSection = FarmTab:CreateSection("Water")
-
-WaterSection:CreateToggle({
-   Name = "Auto Fill Water (Coming Soon)",
+local WateringToogle = FarmTab:CreateToggle({
+   Name = "FIll ALl Water Example",
    CurrentValue = false,
-   Flag = "AutoWaterToggle",
+   Flag = "AutoHarvestToggle",
    Callback = function(Value)
-      if Value then
-         Notify:Fire("Auto Water belum tersedia. Nanti ya sayang! 💧")
-      end
-   end,
-})
-
------------------------------------------------------------
--- TAB 2: ECONOMY
------------------------------------------------------------
-local EconomyTab = Window:CreateTab("Economy", "dollar-sign")
-
--- Section: SELL
-local SellSection = EconomyTab:CreateSection("Sell")
-
-local isAutoSelling = false
-SellSection:CreateToggle({
-   Name = "Auto Sell All",
-   CurrentValue = false,
-   Flag = "AutoSellToggle",
-   Callback = function(Value)
-      isAutoSelling = Value
+      isAutoHarvesting = Value
       
       if Value then
-         Notify:Fire("Auto Sell AKTIF! 💰")
+         Notify:Fire("Harvesting...")
          task.spawn(function()
-            while isAutoSelling and task.wait(2) do
+            while isAutoHarvesting and task.wait(0.5) do
                pcall(function()
-                  local fruitCount = player:GetAttribute("FruitCount") or 0
-                  local maxFruits = player:GetAttribute("MaxFruitCapacity") or 100
+                  local plotId = player:GetAttribute("PlotId")
+                  local fruitCount = player:GetAttribute("FruitCount")
+                  local maxFruits = player:GetAttribute("MaxFruitCapacity")
                   
-                  -- Sell kalau tas udah 90% penuh
-                  if fruitCount >= (maxFruits * 0.9) then
-                     Networking.TeleportButton.Request:Fire("Sell")
-                     task.wait(1.5)
-                     Networking.NPCS.SellAll:Fire()
-                     task.wait(2)
-                     Notify:Fire("Fruits sold! 💰")
+                  if not plotId then return end
+                  
+                  local garden = workspace:WaitForChild("Gardens"):FindFirstChild(string.format("Plot%i", plotId))
+                  if not garden then return end
+                  
+                  local plants = garden:FindFirstChild("Plants")
+                  if not plants then return end
+                  
+                  for _, plant in pairs(plants:GetChildren()) do
+                     if fruitCount >= maxFruits then break end
+                     
+                     local fruits = plant:FindFirstChild("Fruits")
+                     if not fruits then continue end
+                     
+                     for _, fruit in pairs(fruits:GetChildren()) do
+                        if fruitCount >= maxFruits then break end
+                        
+                        local plantId = fruit:GetAttribute("PlantId")
+                        local fruitId = fruit:GetAttribute("FruitId")
+                        
+                        if plantId and fruitId then
+                           Networking.Garden.CollectFruit:Fire(plantId, fruitId)
+                           task.wait()
+                        end
+                     end
+                     
+                     fruitCount = player:GetAttribute("FruitCount") or fruitCount
                   end
                end)
             end
          end)
       else
-         Notify:Fire("Auto Sell DIMATIKAN")
+         Notify:Fire("Auto Harvest Disabled")
       end
    end,
 })
 
--- Load config
+-- EXAMPLE: Auto Sell Toggle (tinggal kamu isi sendiri)
+local EconTab = Window:CreateTab("Economy", "dollar-sign")
+
+local SellToggle = EconTab:CreateToggle({
+   Name = "Auto Sell (When Full)",
+   CurrentValue = false,
+   Flag = "AutoSellToggle",
+   Callback = function(Value)
+      -- TODO: Isi logic auto sell di sini
+   end,
+})
+
+-- EXAMPLE: Auto Claim Toggle
+local ClaimToggle = EconTab:CreateToggle({
+   Name = "Auto Claim Mail",
+   CurrentValue = false,
+   Flag = "AutoClaimToggle",
+   Callback = function(Value)
+      -- TODO: Isi logic auto claim di sini
+   end,
+})
+
 Rayfield:LoadConfiguration()
