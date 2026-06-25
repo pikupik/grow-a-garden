@@ -1,13 +1,9 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- ALL INCLUDES FOR ROBLOX SCRIPTING
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
+local player = Players.LocalPlayer
 local Networking = require(ReplicatedStorage:WaitForChild("SharedModules"):FindFirstChild("Networking"))
 local Notify = ReplicatedStorage:WaitForChild("Notify")
 
@@ -24,7 +20,7 @@ local Window = Rayfield:CreateWindow({
    ConfigurationSaving = {
       Enabled = true,
       FolderName = nil,
-      FileName = "Big Hub"
+      FileName = "Nexera_GAG2"
    },
    Discord = {
       Enabled = false,
@@ -43,21 +39,24 @@ local Window = Rayfield:CreateWindow({
    }
 })
 
--- UI FARM TAB CREATION
-local FarmTab = Window:CreateTab("Auto Harvest", "sprout")
+-----------------------------------------------------------
+-- TAB 1: FARM
+-----------------------------------------------------------
+local FarmTab = Window:CreateTab("Farm", "sprout")
 
--- AUTO HARVEST TOGGLE (Working Logic)
+-- Section: HARVEST
+local HarvestSection = FarmTab:CreateSection("Harvest")
+
 local isAutoHarvesting = false
-
-local Toggle = FarmTab:CreateToggle({
-   Name = "Enabled Auto Harvest",
+HarvestSection:CreateToggle({
+   Name = "Auto Harvest",
    CurrentValue = false,
    Flag = "AutoHarvestToggle",
    Callback = function(Value)
       isAutoHarvesting = Value
       
       if Value then
-         Notify:Fire("Harvesting...")
+         Notify:Fire("Auto Harvest AKTIF! 🌾")
          task.spawn(function()
             while isAutoHarvesting and task.wait(0.5) do
                pcall(function()
@@ -97,31 +96,65 @@ local Toggle = FarmTab:CreateToggle({
             end
          end)
       else
-         Notify:Fire("Auto Harvest Disabled")
+         Notify:Fire("Auto Harvest DIMATIKAN")
       end
    end,
 })
 
--- EXAMPLE: Auto Sell Toggle (tinggal kamu isi sendiri)
-local EconTab = Window:CreateTab("Economy", "dollar-sign")
+-- Section: WATER (Placeholder buat nanti)
+local WaterSection = FarmTab:CreateSection("Water")
 
-local SellToggle = EconTab:CreateToggle({
-   Name = "Auto Sell (When Full)",
+WaterSection:CreateToggle({
+   Name = "Auto Fill Water (Coming Soon)",
+   CurrentValue = false,
+   Flag = "AutoWaterToggle",
+   Callback = function(Value)
+      if Value then
+         Notify:Fire("Auto Water belum tersedia. Nanti ya sayang! 💧")
+      end
+   end,
+})
+
+-----------------------------------------------------------
+-- TAB 2: ECONOMY
+-----------------------------------------------------------
+local EconomyTab = Window:CreateTab("Economy", "dollar-sign")
+
+-- Section: SELL
+local SellSection = EconomyTab:CreateSection("Sell")
+
+local isAutoSelling = false
+SellSection:CreateToggle({
+   Name = "Auto Sell All",
    CurrentValue = false,
    Flag = "AutoSellToggle",
    Callback = function(Value)
-      -- TODO: Isi logic auto sell di sini
+      isAutoSelling = Value
+      
+      if Value then
+         Notify:Fire("Auto Sell AKTIF! 💰")
+         task.spawn(function()
+            while isAutoSelling and task.wait(2) do
+               pcall(function()
+                  local fruitCount = player:GetAttribute("FruitCount") or 0
+                  local maxFruits = player:GetAttribute("MaxFruitCapacity") or 100
+                  
+                  -- Sell kalau tas udah 90% penuh
+                  if fruitCount >= (maxFruits * 0.9) then
+                     Networking.TeleportButton.Request:Fire("Sell")
+                     task.wait(1.5)
+                     Networking.NPCS.SellAll:Fire()
+                     task.wait(2)
+                     Notify:Fire("Fruits sold! 💰")
+                  end
+               end)
+            end
+         end)
+      else
+         Notify:Fire("Auto Sell DIMATIKAN")
+      end
    end,
 })
 
--- EXAMPLE: Auto Claim Toggle
-local ClaimToggle = EconTab:CreateToggle({
-   Name = "Auto Claim Mail",
-   CurrentValue = false,
-   Flag = "AutoClaimToggle",
-   Callback = function(Value)
-      -- TODO: Isi logic auto claim di sini
-   end,
-})
-
+-- Load config
 Rayfield:LoadConfiguration()
