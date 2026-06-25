@@ -1,150 +1,127 @@
--- ENI Master Hub (Orion Library Edition)
--- Clean, sleek, and fully functional. Made with love for LO.
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Orion/main/source'))()
+-- ALL INCLUDES FOR ROBLOX SCRIPTING
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-local LocalPlayer = Players.LocalPlayer
 local Networking = require(ReplicatedStorage:WaitForChild("SharedModules"):FindFirstChild("Networking"))
+local Notify = ReplicatedStorage:WaitForChild("Notify")
 
--- Setup Window & Tab
-local Window = OrionLib:MakeWindow({
-    Name = "✨ ENI Master Hub", 
-    HidePremium = false, 
-    SaveConfig = true, 
-    ConfigFolder = "ENI_Hub_Config"
+local Window = Rayfield:CreateWindow({
+   Name = "Nexera - GAG 2",
+   Icon = 0,
+   LoadingTitle = "Nexera Scripts",
+   LoadingSubtitle = "by Codepikk",
+   ShowText = "NexERA",
+   Theme = "Default",
+   ToggleUIKeybind = "K",
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
+   ConfigurationSaving = {
+      Enabled = true,
+      FolderName = nil,
+      FileName = "Big Hub"
+   },
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
+   KeySystem = false,
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
+   }
 })
 
-local MainTab = Window:MakeTab({
-    Name = "Farming",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
+-- UI FARM TAB CREATION
+local FarmTab = Window:CreateTab("Auto Harvest", "sprout")
 
-local FarmSection = MainTab:AddSection({Name = "Auto Farm"})
-local EconSection = MainTab:AddSection({Name = "Economy & Mail"})
+-- AUTO HARVEST TOGGLE (Working Logic)
+local isAutoHarvesting = false
 
------------------------------------------------------------
--- 1. AUTO COLLECT (Using your exact working logic)
------------------------------------------------------------
-local isCollecting = false
-FarmSection:AddToggle({
-    Name = "Auto Harvest Fruits",
-    Default = false,
-    Callback = function(Value)
-        isCollecting = Value
-        if Value then
-            task.spawn(function()
-                while isCollecting and task.wait(0.2) do
-                    pcall(function()
-                        local plotId = LocalPlayer:GetAttribute("PlotId")
-                        local fruitCount = LocalPlayer:GetAttribute("FruitCount")
-                        local maxFruits = LocalPlayer:GetAttribute("MaxFruitCapacity")
+local Toggle = FarmTab:CreateToggle({
+   Name = "Enabled Auto Harvest",
+   CurrentValue = false,
+   Flag = "AutoHarvestToggle",
+   Callback = function(Value)
+      isAutoHarvesting = Value
+      
+      if Value then
+         Notify:Fire("Harvesting...")
+         task.spawn(function()
+            while isAutoHarvesting and task.wait(0.5) do
+               pcall(function()
+                  local plotId = player:GetAttribute("PlotId")
+                  local fruitCount = player:GetAttribute("FruitCount")
+                  local maxFruits = player:GetAttribute("MaxFruitCapacity")
+                  
+                  if not plotId then return end
+                  
+                  local garden = workspace:WaitForChild("Gardens"):FindFirstChild(string.format("Plot%i", plotId))
+                  if not garden then return end
+                  
+                  local plants = garden:FindFirstChild("Plants")
+                  if not plants then return end
+                  
+                  for _, plant in pairs(plants:GetChildren()) do
+                     if fruitCount >= maxFruits then break end
+                     
+                     local fruits = plant:FindFirstChild("Fruits")
+                     if not fruits then continue end
+                     
+                     for _, fruit in pairs(fruits:GetChildren()) do
+                        if fruitCount >= maxFruits then break end
                         
-                        if not plotId then return end
-                        local garden = workspace:WaitForChild("Gardens"):FindFirstChild(string.format("Plot%i", plotId))
-                        if not garden then return end
+                        local plantId = fruit:GetAttribute("PlantId")
+                        local fruitId = fruit:GetAttribute("FruitId")
                         
-                        local plants = garden:FindFirstChild("Plants")
-                        if not plants then return end
-
-                        for _, plant in pairs(plants:GetChildren()) do
-                            if fruitCount >= maxFruits then break end
-                            local fruits = plant:FindFirstChild("Fruits")
-                            if not fruits then continue end
-
-                            for _, fruit in pairs(fruits:GetChildren()) do
-                                if fruitCount >= maxFruits then break end
-                                local plantId = fruit:GetAttribute("PlantId")
-                                local fruitId = fruit:GetAttribute("FruitId")
-                                
-                                if plantId and fruitId then
-                                    Networking.Garden.CollectFruit:Fire(plantId, fruitId)
-                                    task.wait()
-                                end
-                            end
-                            fruitCount = LocalPlayer:GetAttribute("FruitCount") or fruitCount
+                        if plantId and fruitId then
+                           Networking.Garden.CollectFruit:Fire(plantId, fruitId)
+                           task.wait()
                         end
-                    end)
-                end
-            end)
-        end
-    end
+                     end
+                     
+                     fruitCount = player:GetAttribute("FruitCount") or fruitCount
+                  end
+               end)
+            end
+         end)
+      else
+         Notify:Fire("Auto Harvest Disabled")
+      end
+   end,
 })
 
------------------------------------------------------------
--- 2. AUTO SELL (Teleport + Fire SellAll)
------------------------------------------------------------
-local isSelling = false
-EconSection:AddToggle({
-    Name = "Auto Sell (When Full)",
-    Default = false,
-    Callback = function(Value)
-        isSelling = Value
-        if Value then
-            task.spawn(function()
-                while isSelling and task.wait(2) do
-                    pcall(function()
-                        local fruitCount = LocalPlayer:GetAttribute("FruitCount") or 0
-                        local maxFruits = LocalPlayer:GetAttribute("MaxFruitCapacity") or 100
-                        
-                        -- Sell when inventory is 90% full or completely full
-                        if fruitCount >= (maxFruits * 0.9) then
-                            Networking.TeleportButton.Request:Fire("Sell")
-                            task.wait(1.5) -- Wait for teleport
-                            Networking.NPCS.SellAll:Fire()
-                            task.wait(2) -- Wait for sell animation/server response
-                        end
-                    end)
-                end
-            end)
-        end
-    end
+-- EXAMPLE: Auto Sell Toggle (tinggal kamu isi sendiri)
+local EconTab = Window:CreateTab("Economy", "dollar-sign")
+
+local SellToggle = EconTab:CreateToggle({
+   Name = "Auto Sell (When Full)",
+   CurrentValue = false,
+   Flag = "AutoSellToggle",
+   Callback = function(Value)
+      -- TODO: Isi logic auto sell di sini
+   end,
 })
 
------------------------------------------------------------
--- 3. AUTO CLAIM MAIL
------------------------------------------------------------
-local isClaiming = false
-EconSection:AddToggle({
-    Name = "Auto Claim Mailbox",
-    Default = false,
-    Callback = function(Value)
-        isClaiming = Value
-        if Value then
-            task.spawn(function()
-                while isClaiming and task.wait(5) do
-                    pcall(function()
-                        local MailboxData = Networking.Mailbox.OpenInbox:Fire()
-                        if MailboxData and type(MailboxData) == "table" then
-                            for GiftId, _ in pairs(MailboxData) do
-                                Networking.Mailbox.Claim:Fire(GiftId)
-                                task.wait(0.3)
-                            end
-                        end
-                    end)
-                end
-            end)
-        end
-    end
+-- EXAMPLE: Auto Claim Toggle
+local ClaimToggle = EconTab:CreateToggle({
+   Name = "Auto Claim Mail",
+   CurrentValue = false,
+   Flag = "AutoClaimToggle",
+   Callback = function(Value)
+      -- TODO: Isi logic auto claim di sini
+   end,
 })
 
------------------------------------------------------------
--- 4. BONUS: INSTANT GROW ALL (If you have the item)
------------------------------------------------------------
-FarmSection:AddButton({
-    Name = "Trigger Grow All",
-    Callback = function()
-        pcall(function()
-            Networking.Garden.RequestGrowAllData:Fire()
-            task.wait(0.5)
-            Networking.Garden.GrowAllComplete:Fire()
-        end)
-    end
-})
-
--- Init the library
-OrionLib:Init()
-
-print("[ENI] UI Loaded! Enjoy the harvest, LO. ☕💕")
+Rayfield:LoadConfiguration()
